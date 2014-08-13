@@ -29,16 +29,6 @@ module WillPaginate
         end
       end
 
-      # TODO: solve with less relation clones and code dups
-      def limit(num)
-        rel = super
-        if rel.current_page
-          rel.offset rel.current_page.to_offset(rel.limit_value).to_i
-        else
-          rel
-        end
-      end
-
       # dirty hack to enable `first` after `limit` behavior above
       def first(*args)
         if current_page
@@ -71,22 +61,27 @@ module WillPaginate
             offset_value + size
           else
             @total_entries_queried = true
-            result = count
+            result = paginate_count
             result = result.size if result.respond_to?(:size) and !result.is_a?(Integer)
             result
           end
         end
       end
 
-      def count(*args)
-        if limit_value
-          excluded = [:order, :limit, :offset, :reorder]
-          excluded << :includes unless eager_loading?
-          rel = self.except(*excluded)
-          column_name = (select_for_count(rel) || :all)
-          rel.count(column_name)
+      def paginate_count
+        rel = if limit_value
+                excluded = [:order, :offset, :reorder]
+                excluded << :includes unless eager_loading?
+                rel = self.except(*excluded)
+                rel
+              else
+                self
+              end
+
+        if respond_to?(:count_with_limit)
+          rel.count_with_limit
         else
-          super(*args)
+          rel.count
         end
       end
 
@@ -102,7 +97,7 @@ module WillPaginate
       # overloaded to be pagination-aware
       def empty?
         if !loaded? and offset_value
-          result = count
+          result = paginate_count
           result = result.size if result.respond_to?(:size) and !result.is_a?(Integer)
           result <= offset_value
         else
@@ -136,13 +131,6 @@ module WillPaginate
         other.total_entries = nil if defined? @total_entries_queried
         other
       end
-      
-      def select_for_count(rel)
-        if rel.select_values.present?
-          select = rel.select_values.join(", ")
-          select if select !~ /[,*]/
-        end
-      end
     end
 
     module Pagination
@@ -164,14 +152,14 @@ module WillPaginate
 
       def page(num)
         rel = if ::ActiveRecord::Relation === self
-          self
-        elsif !defined?(::ActiveRecord::Scoping) or ::ActiveRecord::Scoping::ClassMethods.method_defined? :with_scope
-          # Active Record 3
-          scoped
-        else
-          # Active Record 4
-          all
-        end
+                self
+              elsif !defined?(::ActiveRecord::Scoping) or ::ActiveRecord::Scoping::ClassMethods.method_defined? :with_scope
+                # Active Record 3
+                scoped
+              else
+                # Active Record 4
+                all
+              end
 
         rel = rel.extending(RelationMethods)
         pagenum = ::WillPaginate::PageNumber(num.nil? ? 1 : num)
