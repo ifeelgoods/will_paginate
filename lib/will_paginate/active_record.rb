@@ -71,22 +71,18 @@ module WillPaginate
             offset_value + size
           else
             @total_entries_queried = true
-            result = count
+            result = paginate_count
             result = result.size if result.respond_to?(:size) and !result.is_a?(Integer)
             result
           end
         end
       end
-
-      def count(*args)
-        if limit_value
-          excluded = [:order, :limit, :offset, :reorder]
-          excluded << :includes unless eager_loading?
-          rel = self.except(*excluded)
-          column_name = (select_for_count(rel) || :all)
-          rel.count(column_name)
+      
+      def paginate_count
+        if respond_to?(:count_with_limit)
+          count_with_limit
         else
-          super(*args)
+          count
         end
       end
 
@@ -102,7 +98,7 @@ module WillPaginate
       # overloaded to be pagination-aware
       def empty?
         if !loaded? and offset_value
-          result = count
+          result = paginate_count
           result = result.size if result.respond_to?(:size) and !result.is_a?(Integer)
           result <= offset_value
         else
