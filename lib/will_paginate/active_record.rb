@@ -132,13 +132,6 @@ module WillPaginate
         other.total_entries = nil if defined? @total_entries_queried
         other
       end
-      
-      def select_for_count(rel)
-        if rel.select_values.present?
-          select = rel.select_values.join(", ")
-          select if select !~ /[,*]/
-        end
-      end
     end
 
     module Pagination
