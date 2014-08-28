@@ -138,13 +138,6 @@ module WillPaginate
         other.wp_count_options = @wp_count_options if defined? @wp_count_options
         other
       end
-      
-      def select_for_count(rel)
-        if rel.select_values.present?
-          select = rel.select_values.join(", ")
-          select if select !~ /[,*]/
-        end
-      end
     end
 
     module Pagination
